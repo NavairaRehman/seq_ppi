@@ -1,0 +1,22 @@
+name: py36
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.6
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - matplotlib
+  - seaborn
+  - jupyter
+  - notebook
+  - ipython
+  - pytorch
+  - torchvision
+  - cudatoolkit=10.2
+  - pip
+  - pip:
+    - tensorboard

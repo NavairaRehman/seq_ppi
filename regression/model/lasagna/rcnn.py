@@ -11,42 +11,65 @@ from seq2tensor import s2t
 import keras
 
 
-from keras.models import Sequential, Model
-from keras.layers import Dense, Activation, Dropout, Embedding, LSTM, Bidirectional, BatchNormalization, merge, add
-from keras.layers.core import Flatten, Reshape
-from keras.layers.merge import Concatenate, concatenate, subtract, multiply
-from keras.layers.convolutional import Conv1D
-from keras.layers.pooling import MaxPooling1D, AveragePooling1D, GlobalAveragePooling1D
+# from keras.models import Sequential, Model
+# from keras.layers import Dense, Activation, Dropout, Embedding, LSTM, Bidirectional, BatchNormalization, merge, add
+# from keras.layers.core import Flatten, Reshape
+# from keras.layers.merge import Concatenate, concatenate, subtract, multiply
+# from keras.layers.convolutional import Conv1D
+# from keras.layers.pooling import MaxPooling1D, AveragePooling1D, GlobalAveragePooling1D
+from tensorflow.keras import layers, models
+from tensorflow.keras.layers import *
+from tensorflow.keras.optimizers import Adam, RMSprop
 
-from keras.optimizers import Adam,  RMSprop
+# from keras.optimizers import Adam,  RMSprop
+from tensorflow.keras.optimizers import Adam, RMSprop
+
 
 import os
 import tensorflow as tf
-import keras.backend.tensorflow_backend as KTF
+# import keras.backend.tensorflow_backend as KTF
 
-def get_session(gpu_fraction=0.25):
-    '''Assume that you have 6GB of GPU memory and want to allocate ~2GB'''
+# def get_session(gpu_fraction=0.25):
+#     '''Assume that you have 6GB of GPU memory and want to allocate ~2GB'''
 
-    num_threads = os.environ.get('OMP_NUM_THREADS')
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_fraction)
+#     num_threads = os.environ.get('OMP_NUM_THREADS')
+#     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_fraction)
 
-    if num_threads:
-        return tf.Session(config=tf.ConfigProto(
-            gpu_options=gpu_options, intra_op_parallelism_threads=num_threads))
-    else:
-        return tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+#     if num_threads:
+#         return tf.Session(config=tf.ConfigProto(
+#             gpu_options=gpu_options, intra_op_parallelism_threads=num_threads))
+#     else:
+#         return tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
 
-KTF.set_session(get_session())
+# KTF.set_session(get_session())
+
+from tensorflow.keras.callbacks import ModelCheckpoint
+import os
+
+checkpoint_dir = "checkpoints"
+os.makedirs(checkpoint_dir, exist_ok=True)
+
+
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+    except RuntimeError as e:
+        print(e)
+
 
 import numpy as np
 from tqdm import tqdm
 
-from keras.layers import Input, CuDNNGRU
+# from keras.layers import Input, CuDNNGRU
+from tensorflow.keras.layers import GRU, Bidirectional
+
 from numpy import linalg as LA
 import scipy
 
 # change
-id2seq_file = '../../../mtb/preprocessed/SKEMPI_seq.txt'
+id2seq_file = '../../../SKEMPI_all_dg_avg_(PIPR)/SKEMPI_seq.txt'
 
 id2index = {}
 seqs = []
@@ -60,7 +83,7 @@ seq_array = []
 id2_aid = {}
 sid = 0
 
-seq_size = 100
+seq_size =2000
 emb_files = ['../../../embeddings/default_onehot.txt', '../../../embeddings/string_vec5.txt', '../../../embeddings/CTCoding_onehot.txt', '../../../embeddings/vec5_CTC.txt']
 use_emb = 0
 hidden_dim = 25
@@ -146,49 +169,101 @@ for i in range(len(score_labels)):
 print (all_min, all_max)
 #
 
+# def build_model():
+#     seq_input1 = Input(shape=(seq_size, dim), name='seq1')
+#     seq_input2 = Input(shape=(seq_size, dim), name='seq2')
+#     l1=Conv1D(hidden_dim, 3)
+#     r1=Bidirectional(CuDNNGRU(hidden_dim, return_sequences=True))
+#     l2=Conv1D(hidden_dim, 3)
+#     r2=Bidirectional(CuDNNGRU(hidden_dim, return_sequences=True))
+#     l3=Conv1D(hidden_dim, 3)
+#     r3=Bidirectional(CuDNNGRU(hidden_dim, return_sequences=True))
+#     l4=Conv1D(hidden_dim, 3)
+#     r4=Bidirectional(CuDNNGRU(hidden_dim, return_sequences=True))
+#     l5=Conv1D(hidden_dim, 3)
+#     r5=Bidirectional(CuDNNGRU(hidden_dim, return_sequences=True))
+#     l6=Conv1D(hidden_dim, 3)
+#     s1=MaxPooling1D(2)(l1(seq_input1))
+#     s1=concatenate([r1(s1), s1])
+#     s1=MaxPooling1D(2)(l2(s1))
+#     s1=concatenate([r2(s1), s1])
+#     s1=MaxPooling1D(3)(l3(s1))
+#     s1=concatenate([r3(s1), s1])
+#     s1=l6(s1)
+#     s1=GlobalAveragePooling1D()(s1)
+#     s2=MaxPooling1D(2)(l1(seq_input2))
+#     s2=concatenate([r1(s2), s2])
+#     s2=MaxPooling1D(2)(l2(s2))
+#     s2=concatenate([r2(s2), s2])
+#     s2=MaxPooling1D(3)(l3(s2))
+#     s2=concatenate([r3(s2), s2])
+#     s2=l6(s2)
+#     s2=GlobalAveragePooling1D()(s2)
+#     merge_text = multiply([s1, s2])
+#     x = Dense(100, activation='linear')(merge_text)
+#     x = keras.layers.LeakyReLU(alpha=0.3)(x)
+#     main_output = Dense(1, activation='sigmoid')(x)
+#     merge_model = Model(inputs=[seq_input1, seq_input2], outputs=[main_output])
+#     return merge_model
+
+from tensorflow.keras import layers, models
+from tensorflow.keras.layers import Input, Conv1D, GRU, Bidirectional, MaxPooling1D, GlobalAveragePooling1D, Dense, Multiply, LeakyReLU, concatenate
+
 def build_model():
     seq_input1 = Input(shape=(seq_size, dim), name='seq1')
     seq_input2 = Input(shape=(seq_size, dim), name='seq2')
-    l1=Conv1D(hidden_dim, 3)
-    r1=Bidirectional(CuDNNGRU(hidden_dim, return_sequences=True))
-    l2=Conv1D(hidden_dim, 3)
-    r2=Bidirectional(CuDNNGRU(hidden_dim, return_sequences=True))
-    l3=Conv1D(hidden_dim, 3)
-    r3=Bidirectional(CuDNNGRU(hidden_dim, return_sequences=True))
-    l4=Conv1D(hidden_dim, 3)
-    r4=Bidirectional(CuDNNGRU(hidden_dim, return_sequences=True))
-    l5=Conv1D(hidden_dim, 3)
-    r5=Bidirectional(CuDNNGRU(hidden_dim, return_sequences=True))
-    l6=Conv1D(hidden_dim, 3)
-    s1=MaxPooling1D(2)(l1(seq_input1))
-    s1=concatenate([r1(s1), s1])
-    s1=MaxPooling1D(2)(l2(s1))
-    s1=concatenate([r2(s1), s1])
-    s1=MaxPooling1D(3)(l3(s1))
-    s1=concatenate([r3(s1), s1])
-    s1=l6(s1)
-    s1=GlobalAveragePooling1D()(s1)
-    s2=MaxPooling1D(2)(l1(seq_input2))
-    s2=concatenate([r1(s2), s2])
-    s2=MaxPooling1D(2)(l2(s2))
-    s2=concatenate([r2(s2), s2])
-    s2=MaxPooling1D(3)(l3(s2))
-    s2=concatenate([r3(s2), s2])
-    s2=l6(s2)
-    s2=GlobalAveragePooling1D()(s2)
-    merge_text = multiply([s1, s2])
+
+    # Shared branch function
+    def branch(x):
+        l1 = Conv1D(hidden_dim, 3, padding='same')(x)
+        s = MaxPooling1D(2)(l1)
+        r1 = Bidirectional(GRU(hidden_dim, return_sequences=True))(s)
+        s = concatenate([r1, s])
+
+        l2 = Conv1D(hidden_dim, 3, padding='same')(s)
+        s = MaxPooling1D(2)(l2)
+        r2 = Bidirectional(GRU(hidden_dim, return_sequences=True))(s)
+        s = concatenate([r2, s])
+
+        l3 = Conv1D(hidden_dim, 3, padding='same')(s)
+        s = MaxPooling1D(3)(l3)
+        r3 = Bidirectional(GRU(hidden_dim, return_sequences=True))(s)
+        s = concatenate([r3, s])
+
+        l4 = Conv1D(hidden_dim, 3, padding='same')(s)
+        s = MaxPooling1D(2)(l4)
+        r4 = Bidirectional(GRU(hidden_dim, return_sequences=True))(s)
+        s = concatenate([r4, s])
+
+        l5 = Conv1D(hidden_dim, 3, padding='same')(s)
+        s = MaxPooling1D(2)(l5)
+        r5 = Bidirectional(GRU(hidden_dim, return_sequences=True))(s)
+        s = concatenate([r5, s])
+
+        l6 = Conv1D(hidden_dim, 3, padding='same')(s)
+        s = GlobalAveragePooling1D()(l6)
+
+        return s
+
+
+    s1 = branch(seq_input1)
+    s2 = branch(seq_input2)
+
+    merge_text = Multiply()([s1, s2])
     x = Dense(100, activation='linear')(merge_text)
-    x = keras.layers.LeakyReLU(alpha=0.3)(x)
+    x = LeakyReLU(alpha=0.3)(x)
     main_output = Dense(1, activation='sigmoid')(x)
-    merge_model = Model(inputs=[seq_input1, seq_input2], outputs=[main_output])
+
+    merge_model = models.Model(inputs=[seq_input1, seq_input2], outputs=[main_output])
     return merge_model
 
+
 batch_size1 = 32
-adam = Adam(lr=0.005, amsgrad=True, epsilon=1e-5)
+adam = Adam(learning_rate=0.005, amsgrad=True, epsilon=1e-5)
 
 from sklearn.model_selection import KFold, ShuffleSplit
 kf = KFold(n_splits=10)
-tries = 5
+tries = 1
 cur = 0
 recalls = []
 accuracy = []
@@ -218,11 +293,33 @@ def scale_back(v):
 fp2 = open('records/pred_record.'+rst_file[rst_file.rfind('/')+1:], 'w')
 for train, test in train_test:
     merge_model = build_model()
-    adam = Adam(lr=0.001, amsgrad=True, epsilon=1e-6)
+    adam = Adam(learning_rate=0.001, amsgrad=True, epsilon=1e-6)
     rms = RMSprop(lr=0.001)
 
     merge_model.compile(optimizer=adam, loss='mse', metrics=['mse', 'mae'])
-    merge_model.fit([seq_tensor[seq_index1[train]], seq_tensor[seq_index2[train]]], score_labels[train], batch_size=batch_size1, epochs=n_epochs)
+
+    checkpoint_path = os.path.join(checkpoint_dir, "new_best_model.h5")
+    checkpoint_cb = ModelCheckpoint(
+        filepath=checkpoint_path,
+        monitor="val_loss",
+        save_best_only=True,
+        save_weights_only=False,
+        mode="min",
+        verbose=1
+    )
+
+    merge_model.fit(
+        [seq_tensor[seq_index1[train]], seq_tensor[seq_index2[train]]],
+        score_labels[train],
+        batch_size=batch_size1,
+        epochs=n_epochs,
+        validation_data=([seq_tensor[seq_index1[test]], seq_tensor[seq_index2[test]]], score_labels[test]),
+        callbacks=[checkpoint_cb]
+    )
+
+
+
+    # merge_model.fit([seq_tensor[seq_index1[train]], seq_tensor[seq_index2[train]]], score_labels[train], batch_size=batch_size1, epochs=n_epochs)
     #result1 = merge_model.evaluate([seq_tensor1[test], seq_tensor2[test]], score_labels[test])
     pred = merge_model.predict([seq_tensor[seq_index1[test]], seq_tensor[seq_index2[test]]])
     this_mae, this_mse, this_cov = 0., 0., 0.
